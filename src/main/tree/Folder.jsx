@@ -18,6 +18,8 @@ import {
 
 import SpinningWheel from "../../SpinningWheel";
 import { customTransitionDuration } from "../../globalConstant";
+import { setStore } from "../../index";
+import { fetchFileDetails } from "../fileDetailsAPI";
 
 // TODO: use solidjs-icon librairy
 const ArrowIcon = ({ node, toggleExpanded }) => {
@@ -76,7 +78,19 @@ async function fetchSubNodes(node, fetchState, setFetchState) {
       const richerNodes = getRicherNodes(nodes, node.id);
 
       setNodesContent(richerNodes);
-      setNodeById(node.id, { subNodesId: richerNodes.map((n) => n.id) });
+
+      // Check if the node exists before updating it
+      const existingNode = getNodeById(node.id);
+      if (existingNode) {
+        setNodeById(node.id, { subNodesId: richerNodes.map((n) => n.id) });
+      } else {
+        console.warn(`Node ${node.id} not found in content, skipping subNodesId update`);
+        // For shared drives, we might need to create the node first
+        if (node.kind === "drive#teamDrive") {
+          console.log(`Creating shared drive node for ${node.id}`);
+          setNodesContent([{ ...node, subNodesId: richerNodes.map((n) => n.id) }]);
+        }
+      }
 
       setFetchState("done");
     } catch (error) {
@@ -262,28 +276,44 @@ const Folder = ({ node, mustAutofocus }) => {
           autofocus={mustAutofocus}
           ref={nameRef}
           onClick={(e) => {
+            e.stopPropagation();
+            // Single click - show details
+            setStore("selectedFile", node);
+            fetchFileDetails(node.id);
             if (e.detail === 2) {
+              // Double click - toggle expanded
               toggleExpanded();
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              setStore("selectedFile", node);
+              fetchFileDetails(node.id);
             }
           }}
         >
           <img
-            src={node.iconLink}
+            src={
+              node.iconLink ||
+              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' viewBox='0 0 16 16'%3E%3Cpath d='M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2zm0 1h4.586a1 1 0 0 1 .707.293l.707.707H14a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E"
+            }
+            alt=""
             onerror={(event) => {
               const currentImage = event.currentTarget;
-              console.info("First image load failed", currentImage.src);
 
-              // To prevent this from being executed over and over
-              currentImage.onerror = (event) => {
-                const currentImage = event.currentTarget;
-                console.error("Second image load failed", currentImage.src);
-                currentImage.onerror = null;
-                currentImage.src = currentImage.src;
-              };
+              // Use a fallback icon if the image fails to load
+              currentImage.onerror = null; // Prevent infinite loop
 
-              // Refresh the src attribute, which should make the
-              // browsers reload the iamge.
-              currentImage.src = currentImage.src;
+              if (node.kind === "drive#teamDrive" || currentImage.src.includes("shared_drive")) {
+                // Use a shared drive icon
+                currentImage.src =
+                  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%234285f4' viewBox='0 0 16 16'%3E%3Cpath d='M8.5 1.5A1.5 1.5 0 0 1 10 0h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5c-.878 0-1.5.522-1.5 1.5v11c0 .978.622 1.5 1.5 1.5h7c.378 0 .5-.122.5-.5v-11c0-.378-.122-.5-.5-.5h-1a1.5 1.5 0 0 1-1.5-1.5z'/%3E%3C/svg%3E";
+              } else {
+                // Use a generic folder icon
+                currentImage.src =
+                  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' viewBox='0 0 16 16'%3E%3Cpath d='M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2zm0 1h4.586a1 1 0 0 1 .707.293l.707.707H14a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E";
+              }
             }}
           />
           <span

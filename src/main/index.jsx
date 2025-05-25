@@ -1,8 +1,9 @@
-import { createEffect, lazy, onMount } from "solid-js";
+import { Show, createEffect, lazy, onMount } from "solid-js";
 
 import { Route, Routes } from "solid-app-router";
 import { hiddenClass } from "../globalConstant";
 import { store } from "../index";
+import FileDetailsPanel from "./FileDetailsPanel";
 import SearchBar from "./SearchBar";
 import SearchResults from "./SearchResults";
 import Tabs from "./Tabs";
@@ -36,13 +37,28 @@ const Main = () => {
     });
 
     return (
-      <main ref={refMain} id="mainContent" class="transition-transform custom-transition-duration">
-        <Tabs />
-        <div class="p-4">
-          <SearchBar />
-          <SearchResults />
+      <main
+        ref={refMain}
+        id="mainContent"
+        class="transition-transform custom-transition-duration h-full"
+      >
+        <div class="flex flex-col h-full">
+          <Tabs />
+          <div class="flex flex-1 overflow-hidden">
+            <div class="flex-1 flex flex-col overflow-y-auto">
+              <div class="p-4">
+                <SearchBar />
+                <SearchResults />
+              </div>
+              <TreeContainer initSwitch={initSwitch} />
+            </div>
+            <Show when={store.selectedFile}>
+              <div class="w-96">
+                <FileDetailsPanel />
+              </div>
+            </Show>
+          </div>
         </div>
-        <TreeContainer initSwitch={initSwitch} />
       </main>
     );
   };

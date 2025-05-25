@@ -154,3 +154,24 @@ li:hover {
   margin-right: 2px;
   white-space: nowrap;
 }
+
+/* File Details Panel */
+.file-details-panel {
+  width: 100%;
+  min-height: 100%;
+}
+
+.file-details-panel h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.file-details-panel h3 {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #3d4451;
+}
+
+.file-details-panel .badge {
+  font-size: 0.75rem;
+}

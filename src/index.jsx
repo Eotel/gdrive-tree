@@ -34,6 +34,9 @@ const defaultStore = {
   },
   searchResults: null,
   isSearchActive: false,
+  selectedFile: null,
+  fileDetails: null,
+  isLoadingFileDetails: false,
 };
 
 export const [store, setStore] = createStore(defaultStore);

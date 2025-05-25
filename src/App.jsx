@@ -1,4 +1,5 @@
-import { useLocation, useNavigate } from "solid-app-router";
+import { Route, Routes, useLocation, useNavigate } from "solid-app-router";
+import DebugPage from "./debug/DebugPage";
 import Header from "./header";
 import Main from "./main";
 
@@ -16,7 +17,10 @@ const App = () => {
   return (
     <>
       <Header />
-      <Main />
+      <Routes>
+        <Route path="/debug" component={DebugPage} />
+        <Route path="/*" component={Main} />
+      </Routes>
     </>
   );
 };

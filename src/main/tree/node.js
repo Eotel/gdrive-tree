@@ -18,12 +18,32 @@ export function getNodeById(id) {
 
 export function getNodePathByNode(node) {
   const nodePath = [node];
+  const visitedIds = new Set([node.id]);
+
+  // If node doesn't have a parentNodeId or it's null, return just this node
+  if (!node.parentNodeId) {
+    return nodePath;
+  }
 
   let currentNode = getNodeById(node.parentNodeId);
-  while (currentNode) {
+  while (currentNode && !visitedIds.has(currentNode.id)) {
     nodePath.push(currentNode);
+    visitedIds.add(currentNode.id);
+
+    // Stop if we reach a node without a parent (root node)
+    if (!currentNode.parentNodeId) {
+      break;
+    }
+
     currentNode = getNodeById(currentNode.parentNodeId);
   }
+
+  if (currentNode && visitedIds.has(currentNode.id)) {
+    console.error(
+      `Circular reference detected in node path for node ${node.id}, parent chain: ${[...visitedIds].join(" -> ")}`,
+    );
+  }
+
   return nodePath.reverse();
 }
 

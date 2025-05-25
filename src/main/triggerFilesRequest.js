@@ -27,18 +27,21 @@ function buildFilesListArg(args) {
     "supportsAllDrives",
     "supportsTeamDrives",
     "orderBy",
+    "corpora",
+    "driveId",
   ];
 
+  // Process folderId first if it exists
+  if (args.folderId && args.folderId !== undefined) {
+    result.q = "'" + args.folderId + "' in parents and trashed = false";
+  }
+
+  // Then process all other keys, including 'q' which may override the above
   for (const key of Object.keys(args)) {
     if (!authorisedKeys.includes(key)) {
       continue;
     }
-    if (key === "folderId") {
-      const folderId = args[key];
-      if (folderId) {
-        result.q = "'" + folderId + "' in parents and trashed = false";
-      }
-    } else {
+    if (key !== "folderId") {
       result[key] = args[key];
     }
   }
@@ -162,11 +165,11 @@ async function loopRequest(listOptions) {
 function sortNodesDirectoryFirst(node0, node1) {
   if (isFolder(node0) && !isFolder(node1)) {
     return -1;
-  } else if (!isFolder(node0) && isFolder(node1)) {
-    return 1;
-  } else {
-    return node0.name.localeCompare(node1.name);
   }
+  if (!isFolder(node0) && isFolder(node1)) {
+    return 1;
+  }
+  return node0.name.localeCompare(node1.name);
 }
 
 async function higherGetSortedNodes(getSortedNodesFunction, pageSize, fields, folderId) {
@@ -212,6 +215,10 @@ async function getNodesFromDirectory(pageSize, fields, folderId) {
   if (isSharedDrive) {
     requestParams.corpora = "drive";
     requestParams.driveId = folderId;
+    requestParams.includeItemsFromAllDrives = true;
+    requestParams.supportsAllDrives = true;
+    // Keep the folderId to query files in the root of the shared drive
+    // The buildFilesListArg function will handle creating the appropriate query
   }
 
   const result = await loopRequest(requestParams);
@@ -253,7 +260,8 @@ async function initSharedNodes() {
 }
 
 async function getSharedDrives() {
-  try {
+  // Handle authentication like other API calls
+  async function grabDrives() {
     const response = await gapi.client.drive.drives.list({
       pageSize: 100,
       fields: "drives(id, name, kind)",
@@ -269,14 +277,92 @@ async function getSharedDrives() {
       webViewLink: `https://drive.google.com/drive/folders/${drive.id}`,
       iconLink: "https://ssl.gstatic.com/docs/doclist/images/icon_11_shared_drive_2x.png",
     }));
-  } catch (err) {
-    console.error("Failed to get shared drives:", err);
-    return [];
   }
+
+  /**
+   * Make a request for a new token
+   *
+   * @param {string} promptStr
+   * @returns A promise
+   */
+  function getToken(promptStr) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Deal with the response for a new token
+        tokenClient.callback = (resp) => {
+          if (resp.error !== undefined) {
+            reject(resp);
+          }
+          // Save the token to localStorage
+          saveToken(resp);
+          resolve(resp);
+        };
+        // Ask for a new token
+        tokenClient.requestAccessToken({
+          prompt: promptStr || "",
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await grabDrives();
+      resolve(result);
+    } catch (err) {
+      console.info("First call to google API for drives failed.");
+      console.info(err);
+
+      // Clear expired token if it exists
+      if (err.status === 401 || err.status === 403) {
+        clearToken();
+      }
+
+      if (gapi.client.getToken() === null) {
+        console.info("Ask consentment");
+        getToken("consent")
+          .then(async (resp) => {
+            const result = await grabDrives();
+            resolve(result);
+          })
+          .catch((err) => {
+            console.error("Cannot call google API for drives.");
+            console.error(err);
+            resolve([]); // Return empty array instead of rejecting
+          });
+      } else {
+        console.info("Try silent authentication first");
+        // Try without prompt first (silent authentication)
+        getToken("")
+          .then(async (resp) => {
+            const result = await grabDrives();
+            resolve(result);
+          })
+          .catch((err) => {
+            console.info("Silent authentication failed, asking for consent");
+            // If silent auth fails, ask for consent
+            getToken("consent")
+              .then(async (resp) => {
+                const result = await grabDrives();
+                resolve(result);
+              })
+              .catch((err) => {
+                console.error("Cannot call google API for drives.");
+                console.error(err);
+                resolve([]); // Return empty array instead of rejecting
+              });
+          });
+      }
+    }
+  });
 }
 
 async function initSharedDrivesNodes() {
-  return await getSharedDrives();
+  const drives = await getSharedDrives();
+  console.log(`Fetched ${drives.length} shared drives`);
+  return drives;
 }
 
 async function initEveryNodes() {
@@ -302,19 +388,32 @@ export async function triggerFilesRequest(initSwitch) {
     }
   }
 
-  setStore("nodes", (current) => ({ ...current, isLoading: true }));
+  // Clear existing nodes when switching tabs to avoid stale data
+  // But preserve the root node structure
+  setStore("nodes", (current) => ({
+    isInitialised: false,
+    isLoading: true,
+    content: {
+      root: {
+        ...current.content.root,
+        subNodesId: [], // Clear subnodes to avoid referencing non-existent nodes
+      },
+    },
+  }));
 
   const newNodes = await grabFiles(initSwitch);
 
-  const richerNodes = getRicherNodes(newNodes, store.nodes.content[rootId].id);
+  // For shared drives, the parent should always be "root"
+  const parentId = "root";
+  const richerNodes = getRicherNodes(newNodes, parentId);
 
   const nodesToUpdate = {};
   let hasUpdated = false;
 
   const newSubNodesId = richerNodes.map((n) => n.id);
-  if (!_.isEqual(store.nodes.content["root"].subNodesId, newSubNodesId)) {
-    nodesToUpdate["root"] = {
-      ...store.nodes.content["root"],
+  if (!_.isEqual(store.nodes.content.root.subNodesId, newSubNodesId)) {
+    nodesToUpdate.root = {
+      ...store.nodes.content.root,
       subNodesId: newSubNodesId,
     };
     hasUpdated = true;
