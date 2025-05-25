@@ -8,14 +8,7 @@ import { triggerFilesRequest } from "./triggerFilesRequest";
 
 const ShowFilesButton = ({ initSwitch }) => {
   onMount(() => {
-    const htmlElement = document.getElementsByTagName("html")[0];
-    const bodyElement = document.getElementsByTagName("body")[0];
-    const appElement = document.getElementById("app");
-    const mainElement = document.getElementById("mainContent");
-    htmlElement.style.height = "100%";
-    bodyElement.style.height = "100%";
-    appElement.style.height = "100%";
-    mainElement.style.height = "100%";
+    // Height settings removed - now handled by CSS layout
   });
 
   const BigSpinningWheel = () => {

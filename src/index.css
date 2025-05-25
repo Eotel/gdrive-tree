@@ -6,6 +6,7 @@ html,
 body,
 #app {
   height: 100%;
+  overflow: hidden;
 }
 
 /* Spinning wheel */
@@ -137,7 +138,8 @@ min-height: calc(100% - 2rem); */
   display: flex;
   justify-content: center;
   align-items: center;
-  height: calc(100% - 2rem);
+  height: 100%;
+  padding: 2rem;
 }
 
 li {

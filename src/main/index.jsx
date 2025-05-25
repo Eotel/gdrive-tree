@@ -45,15 +45,17 @@ const Main = () => {
         <div class="flex flex-col h-full">
           <Tabs />
           <div class="flex flex-1 overflow-hidden">
-            <div class="flex-1 flex flex-col overflow-y-auto">
-              <div class="p-4">
+            <div class="flex-1 flex flex-col min-w-0">
+              <div class="p-4 flex-shrink-0">
                 <SearchBar />
                 <SearchResults />
               </div>
-              <TreeContainer initSwitch={initSwitch} />
+              <div class="flex-1 overflow-auto">
+                <TreeContainer initSwitch={initSwitch} />
+              </div>
             </div>
             <Show when={store.selectedFile}>
-              <div class="w-96">
+              <div class="w-96 flex-shrink-0 border-l border-base-300">
                 <FileDetailsPanel />
               </div>
             </Show>

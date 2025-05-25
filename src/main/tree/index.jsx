@@ -5,7 +5,6 @@ import { tabbable } from "tabbable";
 import { customTransitionDuration } from "../../globalConstant";
 import Node from "./Node.jsx";
 import {
-  adjustBodyWidth,
   findNearestLowerFocusableElement,
   findNearestUpperLiWithId,
   isElementVisible,
@@ -238,15 +237,6 @@ const Tree = ({ id }) => {
 
   onMount(() => {
     if (isRoot) {
-      const htmlElement = document.getElementsByTagName("html")[0];
-      const bodyElement = document.getElementsByTagName("body")[0];
-      const appElement = document.getElementById("app");
-      const mainElement = document.getElementById("mainContent");
-      htmlElement.style.height = "unset";
-      bodyElement.style.height = "unset";
-      appElement.style.height = "unset";
-      mainElement.style.height = "unset";
-
       treeContainerRef.addEventListener("keydown", handleKeyDown);
       treeRef.style["margin-top"] = "0.5rem";
     }
@@ -279,25 +269,13 @@ const Tree = ({ id }) => {
     }
   });
 
-  // Set body width to display an horizontal scroll bar
-  createEffect(() => {
-    isExpanded();
-
-    if (!isElementVisible(treeContainerRef)) {
-      return;
-    }
-
-    setTimeout(() => {
-      adjustBodyWidth();
-    }, customTransitionDuration);
-  });
 
   return (
     <div
       ref={treeContainerRef}
       class={
         isRoot
-          ? "overflow-hidden tree--open"
+          ? "tree--open"
           : "overflow-hidden tree-container-animation custom-transition-duration"
       }
     >

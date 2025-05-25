@@ -14,7 +14,7 @@ const FileDetailsPanel = () => {
   const [isPublicExpanded, setIsPublicExpanded] = createSignal(false);
 
   return (
-    <div class="file-details-panel h-full bg-base-200 border-l border-base-300 overflow-y-auto">
+    <div class="file-details-panel h-full bg-base-200 flex flex-col">
       <Show
         when={selectedFile()}
         fallback={
@@ -23,9 +23,9 @@ const FileDetailsPanel = () => {
           </div>
         }
       >
-        <div class="p-4">
-          {/* Header with close button */}
-          <div class="flex justify-between items-center mb-4">
+        {/* Fixed Header */}
+        <div class="p-4 border-b border-base-300 flex-shrink-0">
+          <div class="flex justify-between items-center">
             <h2 class="text-lg font-semibold">File Details</h2>
             <button type="button" class="btn btn-sm btn-ghost" onClick={clearFileDetails}>
               <svg
@@ -46,7 +46,10 @@ const FileDetailsPanel = () => {
               </svg>
             </button>
           </div>
+        </div>
 
+        {/* Scrollable Content */}
+        <div class="flex-1 overflow-y-auto p-4">
           <Show
             when={!isLoading()}
             fallback={
