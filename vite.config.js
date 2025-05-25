@@ -9,5 +9,9 @@ export default defineConfig({
   },
   server: {
     port: 9000,
+    headers: {
+      // Remove COOP header to allow OAuth popup communication
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
   },
 });
