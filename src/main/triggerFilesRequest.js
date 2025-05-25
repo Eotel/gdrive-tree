@@ -419,6 +419,7 @@ export async function triggerFilesRequest(initSwitch) {
     hasUpdated = true;
   }
 
+  // Register all nodes in the content store
   for (const node of richerNodes) {
     if (!_.isEqual(node, store.nodes.content[node.id])) {
       nodesToUpdate[node.id] = node;

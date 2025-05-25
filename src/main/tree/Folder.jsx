@@ -79,18 +79,8 @@ async function fetchSubNodes(node, fetchState, setFetchState) {
 
       setNodesContent(richerNodes);
 
-      // Check if the node exists before updating it
-      const existingNode = getNodeById(node.id);
-      if (existingNode) {
-        setNodeById(node.id, { subNodesId: richerNodes.map((n) => n.id) });
-      } else {
-        console.warn(`Node ${node.id} not found in content, skipping subNodesId update`);
-        // For shared drives, we might need to create the node first
-        if (node.kind === "drive#teamDrive") {
-          console.log(`Creating shared drive node for ${node.id}`);
-          setNodesContent([{ ...node, subNodesId: richerNodes.map((n) => n.id) }]);
-        }
-      }
+      // Update the node's subNodesId
+      setNodeById(node.id, { subNodesId: richerNodes.map((n) => n.id) });
 
       setFetchState("done");
     } catch (error) {
