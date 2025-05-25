@@ -53,7 +53,7 @@ export async function fetchFileDetails(fileId) {
       const fileResponse = await gapi.client.drive.files.get({
         fileId: fileId,
         fields:
-          "id,name,mimeType,size,createdTime,modifiedTime,owners,permissions(id,type,role,emailAddress,displayName,photoLink,deleted,allowFileDiscovery,expirationTime),capabilities,webViewLink,webContentLink,iconLink,thumbnailLink,description,starred,trashed,parents,teamDriveId,driveId,shared,writersCanShare,viewersCanCopyContent,lastModifyingUser",
+          "id,name,mimeType,size,createdTime,modifiedTime,owners,permissions(id,type,role,emailAddress,displayName,photoLink,deleted,allowFileDiscovery,expirationTime),capabilities,webViewLink,webContentLink,iconLink,thumbnailLink,hasThumbnail,description,starred,trashed,parents,teamDriveId,driveId,shared,writersCanShare,viewersCanCopyContent,lastModifyingUser",
         supportsAllDrives: true,
       });
 
@@ -145,6 +145,10 @@ export async function fetchFileDetails(fileId) {
       fileData.formattedModifiedTime = new Date(fileData.modifiedTime).toLocaleString();
     }
 
+    // Generate preview URL if possible
+    fileData.previewUrl = generatePreviewUrl(fileData);
+    fileData.canPreview = canFileBePreviewed(fileData);
+
     setStore("fileDetails", fileData);
     setStore("isLoadingFileDetails", false);
 
@@ -179,4 +183,76 @@ export function clearFileDetails() {
   setStore("selectedFile", null);
   setStore("fileDetails", null);
   setStore("isLoadingFileDetails", false);
+}
+
+/**
+ * Check if a file can be previewed
+ * @param {Object} fileData - File metadata
+ * @returns {boolean} Whether the file can be previewed
+ */
+function canFileBePreviewed(fileData) {
+  if (!fileData) return false;
+  
+  // Skip folders
+  if (fileData.mimeType === "application/vnd.google-apps.folder") {
+    return false;
+  }
+  
+  // Skip large files (> 25MB)
+  const maxPreviewSize = 25 * 1024 * 1024; // 25MB
+  if (fileData.size && Number.parseInt(fileData.size) > maxPreviewSize) {
+    return false;
+  }
+  
+  // Check if it's a previewable type
+  return !!generatePreviewUrl(fileData);
+}
+
+/**
+ * Generate preview URL for a file
+ * @param {Object} fileData - File metadata
+ * @returns {string|null} Preview URL or null if not previewable
+ */
+function generatePreviewUrl(fileData) {
+  if (!fileData) return null;
+  
+  const { mimeType, webViewLink, thumbnailLink, id } = fileData;
+  
+  // Use thumbnail if available
+  if (thumbnailLink) {
+    return thumbnailLink;
+  }
+  
+  // Google Docs/Sheets/Slides - transform webViewLink to preview URL
+  const googleDocsTypes = [
+    "application/vnd.google-apps.document",
+    "application/vnd.google-apps.spreadsheet",
+    "application/vnd.google-apps.presentation",
+    "application/vnd.google-apps.drawing"
+  ];
+  
+  if (googleDocsTypes.includes(mimeType) && webViewLink) {
+    // Replace /view or /edit with /preview
+    return webViewLink.replace(/\/(view|edit)(\?|$)/, "/preview$2");
+  }
+  
+  // Images - use direct file URL with authentication
+  const imageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+  if (imageTypes.includes(mimeType) && id) {
+    // This will require authentication token
+    return `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
+  }
+  
+  // PDFs can use webViewLink
+  if (mimeType === "application/pdf" && webViewLink) {
+    return webViewLink;
+  }
+  
+  // Videos - transform webViewLink to preview URL
+  const videoTypes = ["video/mp4", "video/quicktime", "video/x-msvideo"];
+  if (videoTypes.includes(mimeType) && webViewLink) {
+    return webViewLink.replace("/view", "/preview");
+  }
+  
+  return null;
 }

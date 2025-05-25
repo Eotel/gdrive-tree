@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal, onMount, onCleanup } from "solid-js";
 import SpinningWheel from "../SpinningWheel";
 import { setStore, store } from "../index";
 import { clearFileDetails } from "./fileDetailsAPI";
@@ -93,6 +93,51 @@ const FileDetailsPanel = () => {
                   </Show>
                 </div>
               </div>
+
+              {/* File Preview */}
+              <Show when={details().canPreview && details().previewUrl}>
+                <div class="mb-6">
+                  <h3 class="font-medium mb-2 text-sm">Preview</h3>
+                  <div class="border border-base-300 rounded-lg overflow-hidden bg-base-100">
+                    <Show
+                      when={details().mimeType?.startsWith("image/")}
+                      fallback={
+                        <Show
+                          when={details().thumbnailLink}
+                          fallback={
+                            <div class="aspect-video relative">
+                              <iframe
+                                src={details().previewUrl}
+                                class="w-full h-full"
+                                title={`Preview of ${details().name}`}
+                                sandbox="allow-scripts allow-same-origin"
+                              />
+                            </div>
+                          }
+                        >
+                          <div class="p-4 flex justify-center">
+                            <img
+                              src={details().thumbnailLink}
+                              alt={`Thumbnail of ${details().name}`}
+                              class="max-w-full max-h-48 object-contain"
+                              loading="lazy"
+                            />
+                          </div>
+                        </Show>
+                      }
+                    >
+                      <div class="p-4 flex justify-center">
+                        <PreviewImage fileData={details()} />
+                      </div>
+                    </Show>
+                  </div>
+                  <Show when={details().size && Number.parseInt(details().size) > 10 * 1024 * 1024}>
+                    <p class="text-xs text-gray-500 mt-2">
+                      ⚠️ Large file preview may take time to load
+                    </p>
+                  </Show>
+                </div>
+              </Show>
 
               {/* Ownership Information */}
               <Show 
@@ -566,5 +611,89 @@ function getDisplayRole(role) {
   };
   return roleNames[role] || role;
 }
+
+/**
+ * Component to display image preview with authentication
+ */
+const PreviewImage = ({ fileData }) => {
+  const [imageUrl, setImageUrl] = createSignal(null);
+  const [isLoading, setIsLoading] = createSignal(true);
+  const [error, setError] = createSignal(false);
+
+  onMount(async () => {
+    if (!fileData.previewUrl) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // For direct API media URLs, we need to fetch with authentication
+      if (fileData.previewUrl.includes("/files/") && fileData.previewUrl.includes("alt=media")) {
+        const token = gapi.auth.getToken().access_token;
+        const response = await fetch(fileData.previewUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load image");
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setImageUrl(url);
+        
+        // Clean up blob URL when component unmounts
+        onCleanup(() => URL.revokeObjectURL(url));
+      } else {
+        // For thumbnail URLs, use directly
+        setImageUrl(fileData.previewUrl);
+      }
+    } catch (err) {
+      console.error("Failed to load image preview:", err);
+      setError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  });
+
+  return (
+    <Show
+      when={!isLoading()}
+      fallback={<SpinningWheel size="small" />}
+    >
+      <Show
+        when={!error() && imageUrl()}
+        fallback={
+          <div class="text-center py-8 text-gray-500">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-12 w-12 mx-auto mb-2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            <p class="text-sm">Preview unavailable</p>
+          </div>
+        }
+      >
+        <img
+          src={imageUrl()}
+          alt={`Preview of ${fileData.name}`}
+          class="max-w-full max-h-96 object-contain"
+          loading="lazy"
+        />
+      </Show>
+    </Show>
+  );
+};
 
 export default FileDetailsPanel;
