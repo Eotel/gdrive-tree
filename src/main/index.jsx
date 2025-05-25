@@ -1,4 +1,4 @@
-import { Show, createEffect, lazy, onMount } from "solid-js";
+import { Show, createEffect, lazy, onCleanup, onMount } from "solid-js";
 
 import { Route, Routes } from "solid-app-router";
 import { hiddenClass } from "../globalConstant";
@@ -29,12 +29,20 @@ const Main = () => {
       }
     });
 
-    // Trigger files request when external lib is loaded or tab changes
+    // Track if this specific component instance has loaded data
+    let hasLoadedData = false;
+    
+    // Trigger files request when conditions are met
     createEffect(() => {
-      // Access initSwitch to make it a dependency
-      const currentSwitch = initSwitch;
-      if (store.isExternalLibLoaded && currentSwitch) {
-        triggerFilesRequest(currentSwitch);
+      // Check all conditions
+      if (store.isExternalLibLoaded && 
+          store.hasCredential && 
+          !hasLoadedData && 
+          !store.nodes.isLoading &&
+          initSwitch) {
+        console.log(`Triggering files request for tab: ${initSwitch}`);
+        hasLoadedData = true;
+        triggerFilesRequest(initSwitch);
       }
     });
 

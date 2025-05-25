@@ -1,4 +1,5 @@
 import { setStore, store } from "./index";
+import { hasValidToken } from "./tokenStorage";
 
 export function checkHasCredential() {
   // WARNING: this if to check the store.nodes.isLoading signal is necessary to
@@ -6,7 +7,8 @@ export function checkHasCredential() {
   store.nodes.isLoading;
   store.nodes.isInitialised;
   if (store.isExternalLibLoaded) {
-    const newHasCredential = gapi.client.getToken() !== null;
+    // Check both gapi token and localStorage token
+    const newHasCredential = gapi.client.getToken() !== null || hasValidToken();
     if (store.hasCredential !== newHasCredential) {
       setStore("hasCredential", () => newHasCredential);
     }

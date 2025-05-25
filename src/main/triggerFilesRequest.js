@@ -2,7 +2,7 @@ import _ from "lodash";
 
 import { setStore, store } from "../index";
 import { tokenClient } from "../init";
-import { clearToken, saveToken } from "../tokenStorage";
+import { clearToken, getSavedToken, saveToken } from "../tokenStorage";
 import { getRicherNodes, isFolder } from "./tree/node";
 
 import { rootId } from "./../globalConstant";
@@ -403,6 +403,11 @@ export async function triggerFilesRequest(initSwitch) {
     }
   }
 
+  // Clear cache for root when switching tabs to ensure fresh data
+  if (initSwitch === "drive" || initSwitch === "shared" || initSwitch === "sharedDrives") {
+    delete nodesCache["root"];
+  }
+
   // Set loading state without clearing all data
   setStore("nodes", "isLoading", true);
 
@@ -416,10 +421,20 @@ export async function triggerFilesRequest(initSwitch) {
   const currentRootSubNodes = store.nodes.content.root?.subNodesId || [];
   const newSubNodesId = richerNodes.map((n) => n.id);
   
+  // Get the default root node structure
+  const rootNode = store.nodes.content.root || {
+    id: "root",
+    name: "ROOT",
+    mimeType: "application/vnd.google-apps.folder",
+    parentNodeId: null,
+    subNodesId: [],
+    isExpanded: true,
+  };
+  
   // Create a new content object with only root and the new nodes
   const newContent = {
     root: {
-      ...store.nodes.content.root,
+      ...rootNode,
       subNodesId: newSubNodesId,
     },
   };
