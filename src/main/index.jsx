@@ -1,9 +1,11 @@
-import { onMount } from "solid-js";
+import { onMount, lazy } from "solid-js";
 
 import Tabs from "./Tabs";
 import TreeContainer from "./TreeContainer";
 import { Routes, Route } from "solid-app-router";
 import { hiddenClass } from "../globalConstant";
+
+const TestSharedDrives = lazy(() => import("../../test-shared-drives"));
 
 const Main = () => {
   const MainContent = ({ initSwitch }) => {
@@ -38,6 +40,8 @@ const Main = () => {
     <Routes>
       <Route path="/" element={<MainContent initSwitch="drive" />} />
       <Route path="/shared" element={<MainContent initSwitch="shared" />} />
+      <Route path="/shared-drives" element={<MainContent initSwitch="sharedDrives" />} />
+      <Route path="/test" element={<TestSharedDrives />} />
     </Routes>
   );
 };

@@ -1,5 +1,5 @@
 import { NavLink } from "solid-app-router";
-import { onMount } from "solid-js";
+import { onMount, For } from "solid-js";
 
 import { store } from "../index";
 import { triggerFilesRequest } from "./triggerFilesRequest";
@@ -14,6 +14,7 @@ const Tabs = ({ initSwitch }) => {
   const tabs = [
     { path: "/", label: "My Drive" },
     { path: "/shared", label: "Shared with me" },
+    { path: "/shared-drives", label: "Shared Drives" },
   ];
 
   return (

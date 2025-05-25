@@ -2,7 +2,7 @@ import { createEffect, onMount, onCleanup } from "solid-js";
 
 import { tabbable } from "tabbable";
 
-import Node from "./Node";
+import Node from "./Node.jsx";
 import { setNodeById, getNodeById, isFolder } from "./node";
 import {
   findNearestLowerFocusableElement,

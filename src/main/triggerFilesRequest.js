@@ -181,14 +181,26 @@ async function getNodesFromDirectory(pageSize, fields, folderId) {
     return nodesCache[folderId];
   }
 
-  const result = await loopRequest({
+  // Check if this is a shared drive ID by looking at the parent node
+  const parentNode = store.nodes.content[folderId];
+  const isSharedDrive = parentNode && parentNode.kind === "drive#teamDrive";
+  
+  const requestParams = {
     pageSize,
     fields,
     includeItemsFromAllDrives: true,
     supportsAllDrives: true,
     folderId,
     spaces: "drive",
-  });
+  };
+  
+  // If this is a shared drive, add corpora and driveId parameters
+  if (isSharedDrive) {
+    requestParams.corpora = "drive";
+    requestParams.driveId = folderId;
+  }
+
+  const result = await loopRequest(requestParams);
 
   retrieveFolderIds(result);
 
@@ -231,6 +243,33 @@ async function initSharedNodes() {
   return await getSortedSharedNodes(999, "*");
 }
 
+async function getSharedDrives() {
+  try {
+    const response = await gapi.client.drive.drives.list({
+      pageSize: 100,
+      fields: "drives(id, name, kind)"
+    });
+    
+    // Convert shared drives to node format
+    const drives = response.result.drives || [];
+    return drives.map(drive => ({
+      id: drive.id,
+      name: drive.name,
+      mimeType: "application/vnd.google-apps.folder",
+      kind: "drive#teamDrive",
+      webViewLink: `https://drive.google.com/drive/folders/${drive.id}`,
+      iconLink: "https://ssl.gstatic.com/docs/doclist/images/icon_11_shared_drive_2x.png"
+    }));
+  } catch (err) {
+    console.error("Failed to get shared drives:", err);
+    return [];
+  }
+}
+
+async function initSharedDrivesNodes() {
+  return await getSharedDrives();
+}
+
 async function initEveryNodes() {
   return await getSortedEveryNodes(999, "*");
 }
@@ -242,6 +281,8 @@ export async function triggerFilesRequest(initSwitch) {
         return initNodesFromRoot();
       case "shared":
         return initSharedNodes();
+      case "sharedDrives":
+        return initSharedDrivesNodes();
       case "every":
         return initEveryNodes();
       default:
