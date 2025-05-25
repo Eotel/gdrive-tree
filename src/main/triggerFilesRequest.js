@@ -12,6 +12,39 @@ import { rootId } from "./../globalConstant";
  */
 const nodesCache = {};
 
+/**
+ * Make a request for a new token
+ *
+ * @param {string} promptStr
+ * @returns A promise
+ */
+function getToken(promptStr) {
+  return new Promise((resolve, reject) => {
+    try {
+      // Save current path before authentication
+      if (promptStr === "consent") {
+        sessionStorage.setItem("gdrive_auth_return_path", window.location.pathname);
+      }
+      
+      // Deal with the response for a new token
+      tokenClient.callback = (resp) => {
+        if (resp.error !== undefined) {
+          reject(resp);
+        }
+        // Save the token to localStorage
+        saveToken(resp);
+        resolve(resp);
+      };
+      // Ask for a new token
+      tokenClient.requestAccessToken({
+        prompt: promptStr || "",
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 function buildFilesListArg(args) {
   const result = {};
 
@@ -80,34 +113,6 @@ async function loopRequest(listOptions) {
       }
     } while (nextPageToken);
     return result;
-  }
-
-  /**
-   * Make a request for a new token
-   *
-   * @param {string} promptStr
-   * @returns A promise
-   */
-  function getToken(promptStr) {
-    return new Promise((resolve, reject) => {
-      try {
-        // Deal with the response for a new token
-        tokenClient.callback = (resp) => {
-          if (resp.error !== undefined) {
-            reject(resp);
-          }
-          // Save the token to localStorage
-          saveToken(resp);
-          resolve(resp);
-        };
-        // Ask for a new token
-        tokenClient.requestAccessToken({
-          prompt: promptStr || "",
-        });
-      } catch (err) {
-        reject(err);
-      }
-    });
   }
 
   return new Promise(async (resolve, reject) => {
@@ -279,34 +284,6 @@ async function getSharedDrives() {
     }));
   }
 
-  /**
-   * Make a request for a new token
-   *
-   * @param {string} promptStr
-   * @returns A promise
-   */
-  function getToken(promptStr) {
-    return new Promise((resolve, reject) => {
-      try {
-        // Deal with the response for a new token
-        tokenClient.callback = (resp) => {
-          if (resp.error !== undefined) {
-            reject(resp);
-          }
-          // Save the token to localStorage
-          saveToken(resp);
-          resolve(resp);
-        };
-        // Ask for a new token
-        tokenClient.requestAccessToken({
-          prompt: promptStr || "",
-        });
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }
-
   return new Promise(async (resolve, reject) => {
     try {
       const result = await grabDrives();
@@ -388,18 +365,8 @@ export async function triggerFilesRequest(initSwitch) {
     }
   }
 
-  // Clear existing nodes when switching tabs to avoid stale data
-  // But preserve the root node structure
-  setStore("nodes", (current) => ({
-    isInitialised: false,
-    isLoading: true,
-    content: {
-      root: {
-        ...current.content.root,
-        subNodesId: [], // Clear subnodes to avoid referencing non-existent nodes
-      },
-    },
-  }));
+  // Set loading state without clearing all data
+  setStore("nodes", "isLoading", true);
 
   const newNodes = await grabFiles(initSwitch);
 
@@ -407,40 +374,28 @@ export async function triggerFilesRequest(initSwitch) {
   const parentId = "root";
   const richerNodes = getRicherNodes(newNodes, parentId);
 
-  const nodesToUpdate = {};
-  let hasUpdated = false;
-
+  // Clear only the direct children of root, preserving the root node itself
+  const currentRootSubNodes = store.nodes.content.root?.subNodesId || [];
   const newSubNodesId = richerNodes.map((n) => n.id);
-  if (!_.isEqual(store.nodes.content.root.subNodesId, newSubNodesId)) {
-    nodesToUpdate.root = {
+  
+  // Create a new content object with only root and the new nodes
+  const newContent = {
+    root: {
       ...store.nodes.content.root,
       subNodesId: newSubNodesId,
-    };
-    hasUpdated = true;
-  }
+    },
+  };
 
-  // Register all nodes in the content store
+  // Add all new nodes to the content
   for (const node of richerNodes) {
-    if (!_.isEqual(node, store.nodes.content[node.id])) {
-      nodesToUpdate[node.id] = node;
-      hasUpdated = true;
-    }
+    newContent[node.id] = node;
   }
 
-  if (hasUpdated) {
-    if (Object.keys(nodesToUpdate).length) {
-      setStore("nodes", (current) => ({
-        ...current,
-        isInitialised: true,
-        isLoading: false,
-        content: { ...current.content, ...nodesToUpdate },
-      }));
-    }
-  } else {
-    setStore("nodes", (current) => ({
-      ...current,
-      isInitialised: true,
-      isLoading: false,
-    }));
-  }
+  // Update the store with new content
+  setStore("nodes", (current) => ({
+    ...current,
+    isInitialised: true,
+    isLoading: false,
+    content: newContent,
+  }));
 }

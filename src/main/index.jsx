@@ -29,10 +29,12 @@ const Main = () => {
       }
     });
 
-    // Trigger files request when external lib is loaded
+    // Trigger files request when external lib is loaded or tab changes
     createEffect(() => {
-      if (store.isExternalLibLoaded && initSwitch) {
-        triggerFilesRequest(initSwitch);
+      // Access initSwitch to make it a dependency
+      const currentSwitch = initSwitch;
+      if (store.isExternalLibLoaded && currentSwitch) {
+        triggerFilesRequest(currentSwitch);
       }
     });
 
