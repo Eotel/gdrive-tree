@@ -1,8 +1,9 @@
 import _ from "lodash";
 
-import { getRicherNodes, isFolder } from "./tree/node";
+import { setStore, store } from "../index";
 import { tokenClient } from "../init";
-import { store, setStore } from "../index";
+import { clearToken, saveToken } from "../tokenStorage";
+import { getRicherNodes, isFolder } from "./tree/node";
 
 import { rootId } from "./../globalConstant";
 
@@ -92,11 +93,13 @@ async function loopRequest(listOptions) {
           if (resp.error !== undefined) {
             reject(resp);
           }
+          // Save the token to localStorage
+          saveToken(resp);
           resolve(resp);
         };
         // Ask for a new token
         tokenClient.requestAccessToken({
-          prompt: promptStr,
+          prompt: promptStr || "",
         });
       } catch (err) {
         reject(err);
@@ -111,6 +114,12 @@ async function loopRequest(listOptions) {
     } catch (err) {
       console.info("First call to google API failed.");
       console.info(err);
+
+      // Clear expired token if it exists
+      if (err.status === 401 || err.status === 403) {
+        clearToken();
+      }
+
       if (gapi.client.getToken() === null) {
         console.info("Ask consentment");
         getToken("consent")
@@ -124,16 +133,26 @@ async function loopRequest(listOptions) {
             reject(err);
           });
       } else {
-        console.info("Renew consentment");
-        getToken("consent")
+        console.info("Try silent authentication first");
+        // Try without prompt first (silent authentication)
+        getToken("")
           .then(async (resp) => {
             const result = await grabFiles(listOptions);
             resolve(result);
           })
           .catch((err) => {
-            console.error("Cannot call google API.");
-            console.error(err);
-            reject(err);
+            console.info("Silent authentication failed, asking for consent");
+            // If silent auth fails, ask for consent
+            getToken("consent")
+              .then(async (resp) => {
+                const result = await grabFiles(listOptions);
+                resolve(result);
+              })
+              .catch((err) => {
+                console.error("Cannot call google API.");
+                console.error(err);
+                reject(err);
+              });
           });
       }
     }
@@ -150,12 +169,7 @@ function sortNodesDirectoryFirst(node0, node1) {
   }
 }
 
-async function higherGetSortedNodes(
-  getSortedNodesFunction,
-  pageSize,
-  fields,
-  folderId
-) {
+async function higherGetSortedNodes(getSortedNodesFunction, pageSize, fields, folderId) {
   const nodes = await getSortedNodesFunction(pageSize, fields, folderId);
   nodes.sort(sortNodesDirectoryFirst);
   return nodes;
@@ -184,7 +198,7 @@ async function getNodesFromDirectory(pageSize, fields, folderId) {
   // Check if this is a shared drive ID by looking at the parent node
   const parentNode = store.nodes.content[folderId];
   const isSharedDrive = parentNode && parentNode.kind === "drive#teamDrive";
-  
+
   const requestParams = {
     pageSize,
     fields,
@@ -193,7 +207,7 @@ async function getNodesFromDirectory(pageSize, fields, folderId) {
     folderId,
     spaces: "drive",
   };
-  
+
   // If this is a shared drive, add corpora and driveId parameters
   if (isSharedDrive) {
     requestParams.corpora = "drive";
@@ -210,12 +224,7 @@ async function getNodesFromDirectory(pageSize, fields, folderId) {
 }
 
 export async function getSortedNodesFromDirectory(pageSize, fields, folderId) {
-  return await higherGetSortedNodes(
-    getNodesFromDirectory,
-    pageSize,
-    fields,
-    folderId
-  );
+  return await higherGetSortedNodes(getNodesFromDirectory, pageSize, fields, folderId);
 }
 
 async function getSharedNodes(pageSize, fields) {
@@ -247,18 +256,18 @@ async function getSharedDrives() {
   try {
     const response = await gapi.client.drive.drives.list({
       pageSize: 100,
-      fields: "drives(id, name, kind)"
+      fields: "drives(id, name, kind)",
     });
-    
+
     // Convert shared drives to node format
     const drives = response.result.drives || [];
-    return drives.map(drive => ({
+    return drives.map((drive) => ({
       id: drive.id,
       name: drive.name,
       mimeType: "application/vnd.google-apps.folder",
       kind: "drive#teamDrive",
       webViewLink: `https://drive.google.com/drive/folders/${drive.id}`,
-      iconLink: "https://ssl.gstatic.com/docs/doclist/images/icon_11_shared_drive_2x.png"
+      iconLink: "https://ssl.gstatic.com/docs/doclist/images/icon_11_shared_drive_2x.png",
     }));
   } catch (err) {
     console.error("Failed to get shared drives:", err);
@@ -295,7 +304,7 @@ export async function triggerFilesRequest(initSwitch) {
 
   setStore("nodes", (current) => ({ ...current, isLoading: true }));
 
-  let newNodes = await grabFiles(initSwitch);
+  const newNodes = await grabFiles(initSwitch);
 
   const richerNodes = getRicherNodes(newNodes, store.nodes.content[rootId].id);
 

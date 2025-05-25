@@ -1,9 +1,13 @@
-import { onMount, lazy } from "solid-js";
+import { createEffect, lazy, onMount } from "solid-js";
 
+import { Route, Routes } from "solid-app-router";
+import { hiddenClass } from "../globalConstant";
+import { store } from "../index";
+import SearchBar from "./SearchBar";
+import SearchResults from "./SearchResults";
 import Tabs from "./Tabs";
 import TreeContainer from "./TreeContainer";
-import { Routes, Route } from "solid-app-router";
-import { hiddenClass } from "../globalConstant";
+import { triggerFilesRequest } from "./triggerFilesRequest";
 
 const TestSharedDrives = lazy(() => import("../../test-shared-drives"));
 
@@ -24,13 +28,20 @@ const Main = () => {
       }
     });
 
+    // Trigger files request when external lib is loaded
+    createEffect(() => {
+      if (store.isExternalLibLoaded && initSwitch) {
+        triggerFilesRequest(initSwitch);
+      }
+    });
+
     return (
-      <main
-        ref={refMain}
-        id="mainContent"
-        class="transition-transform custom-transition-duration"
-      >
-        <Tabs initSwitch={initSwitch} />
+      <main ref={refMain} id="mainContent" class="transition-transform custom-transition-duration">
+        <Tabs />
+        <div class="p-4">
+          <SearchBar />
+          <SearchResults />
+        </div>
         <TreeContainer initSwitch={initSwitch} />
       </main>
     );

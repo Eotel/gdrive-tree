@@ -32,7 +32,7 @@ export function findChildElementWithPredicat(element, predicat) {
 export function findNearestLowerFocusableElement(element) {
   const childElementWithTabIndex = findChildElementWithPredicat(
     element,
-    (element) => element.getAttribute("tabindex") !== null
+    (element) => element.getAttribute("tabindex") !== null,
   );
 
   if (childElementWithTabIndex) {
@@ -45,7 +45,7 @@ export function findNearestLowerFocusableElement(element) {
 export function findNearestUpperLiWithId(element) {
   const parentElementWithId = findParentElementWithPredicat(
     element,
-    (element) => element.tagName === "LI" && element.getAttribute("id") !== null
+    (element) => element.tagName === "LI" && element.getAttribute("id") !== null,
   );
 
   if (parentElementWithId) {
@@ -81,9 +81,9 @@ export function isElementVisible(element) {
 
 export function adjustBodyWidth() {
   // Every node that the width has to be checked
-  let listElement = Array.from(
-    document.querySelectorAll("span.selectable")
-  ).filter((elt) => isElementVisible(elt));
+  const listElement = Array.from(document.querySelectorAll("span.selectable")).filter((elt) =>
+    isElementVisible(elt),
+  );
 
   const maxLineWidth = listElement
     .map((elt) => {

@@ -1,9 +1,9 @@
-import { createSignal, createEffect, Show, onMount } from "solid-js";
+import { Show, createEffect, createSignal, onMount } from "solid-js";
 
-import { store, setStore } from "../index";
-import Tree from "./tree";
 import SpinningWheel from "../SpinningWheel";
 import { checkHasCredential } from "../checkHasCredential";
+import { setStore, store } from "../index";
+import Tree from "./tree";
 import { triggerFilesRequest } from "./triggerFilesRequest";
 
 const ShowFilesButton = ({ initSwitch }) => {
@@ -53,11 +53,7 @@ const TreeContainer = ({ initSwitch }) => {
 
   return (
     <Show
-      when={
-        store.hasCredential &&
-        store.nodes.isInitialised &&
-        !store.nodes.isLoading
-      }
+      when={store.hasCredential && store.nodes.isInitialised && !store.nodes.isLoading}
       fallback={<ShowFilesButton initSwitch={initSwitch} />}
     >
       <Tree id="root" />

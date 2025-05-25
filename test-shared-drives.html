@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Shared Drives API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Drive API Test - Shared Drives</h1>
+    
+    <div class="section">
+        <h2>1. Initialize & Authenticate</h2>
+        <button id="initBtn">Initialize API</button>
+        <button id="authBtn" disabled>Authenticate</button>
+        <pre id="authStatus">Not initialized</pre>
+    </div>
+
+    <div class="section">
+        <h2>2. Test API Endpoints</h2>
+        <button id="listSharedDrivesBtn" disabled>List Shared Drives</button>
+        <button id="listSharedWithMeBtn" disabled>List Shared With Me</button>
+        <button id="listMyDriveBtn" disabled>List My Drive Files</button>
+        <pre id="apiResults">No results yet</pre>
+    </div>
+
+    <div class="section">
+        <h2>3. Test Shared Drive Contents</h2>
+        <select id="sharedDriveSelect" disabled>
+            <option value="">Select a shared drive</option>
+        </select>
+        <button id="listDriveContentsBtn" disabled>List Drive Contents</button>
+        <pre id="driveContents">No drive selected</pre>
+    </div>
+
+    <script>
+        const CLIENT_ID = import.meta.env?.VITE_CLIENT_ID || '570181948487-9gon32kblr2bs5t1voaf8nlr4325tq0g.apps.googleusercontent.com';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+        
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+
+        function updateStatus(elementId, message) {
+            document.getElementById(elementId).textContent = 
+                typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
+        }
+
+        function enableButtons() {
+            document.getElementById('listSharedDrivesBtn').disabled = false;
+            document.getElementById('listSharedWithMeBtn').disabled = false;
+            document.getElementById('listMyDriveBtn').disabled = false;
+        }
+
+        // Initialize Google API
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+
+        async function initializeGapiClient() {
+            await gapi.client.init({
+                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+            });
+            gapiInited = true;
+            maybeEnableButtons();
+            updateStatus('authStatus', 'GAPI initialized');
+        }
+
+        // Initialize Google Identity Services
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '', // defined later
+            });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                document.getElementById('authBtn').disabled = false;
+                updateStatus('authStatus', 'Ready to authenticate');
+            }
+        }
+
+        // Handle authentication
+        async function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) {
+                    throw (resp);
+                }
+                updateStatus('authStatus', 'Authenticated successfully');
+                enableButtons();
+            };
+
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+
+        // API Test Functions
+        async function listSharedDrives() {
+            updateStatus('apiResults', 'Loading shared drives...');
+            try {
+                const response = await gapi.client.drive.drives.list({
+                    pageSize: 100,
+                    fields: '*'
+                });
+                
+                const drives = response.result.drives || [];
+                updateStatus('apiResults', {
+                    count: drives.length,
+                    drives: drives.map(d => ({
+                        id: d.id,
+                        name: d.name,
+                        kind: d.kind,
+                        capabilities: d.capabilities
+                    }))
+                });
+
+                // Populate dropdown
+                const select = document.getElementById('sharedDriveSelect');
+                select.innerHTML = '<option value="">Select a shared drive</option>';
+                drives.forEach(drive => {
+                    const option = document.createElement('option');
+                    option.value = drive.id;
+                    option.textContent = drive.name;
+                    select.appendChild(option);
+                });
+                select.disabled = false;
+                document.getElementById('listDriveContentsBtn').disabled = false;
+            } catch (err) {
+                updateStatus('apiResults', `Error: ${err.message || err}`);
+            }
+        }
+
+        async function listSharedWithMe() {
+            updateStatus('apiResults', 'Loading shared with me files...');
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: 'sharedWithMe = true',
+                    pageSize: 100,
+                    fields: 'files(id, name, mimeType, owners, shared, sharingUser)',
+                    includeItemsFromAllDrives: true,
+                    supportsAllDrives: true
+                });
+                
+                const files = response.result.files || [];
+                updateStatus('apiResults', {
+                    count: files.length,
+                    files: files.slice(0, 10).map(f => ({
+                        id: f.id,
+                        name: f.name,
+                        mimeType: f.mimeType,
+                        owners: f.owners?.map(o => o.displayName),
+                        sharingUser: f.sharingUser?.displayName
+                    }))
+                });
+            } catch (err) {
+                updateStatus('apiResults', `Error: ${err.message || err}`);
+            }
+        }
+
+        async function listMyDriveFiles() {
+            updateStatus('apiResults', 'Loading My Drive files...');
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: "'root' in parents and trashed = false",
+                    pageSize: 100,
+                    fields: 'files(id, name, mimeType)',
+                    includeItemsFromAllDrives: false,
+                    supportsAllDrives: false
+                });
+                
+                const files = response.result.files || [];
+                updateStatus('apiResults', {
+                    count: files.length,
+                    files: files.slice(0, 10).map(f => ({
+                        id: f.id,
+                        name: f.name,
+                        mimeType: f.mimeType
+                    }))
+                });
+            } catch (err) {
+                updateStatus('apiResults', `Error: ${err.message || err}`);
+            }
+        }
+
+        async function listDriveContents() {
+            const driveId = document.getElementById('sharedDriveSelect').value;
+            if (!driveId) {
+                updateStatus('driveContents', 'Please select a shared drive');
+                return;
+            }
+
+            updateStatus('driveContents', 'Loading drive contents...');
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: `'${driveId}' in parents and trashed = false`,
+                    pageSize: 100,
+                    fields: 'files(id, name, mimeType, parents)',
+                    includeItemsFromAllDrives: true,
+                    supportsAllDrives: true,
+                    corpora: 'drive',
+                    driveId: driveId
+                });
+                
+                const files = response.result.files || [];
+                updateStatus('driveContents', {
+                    driveId: driveId,
+                    count: files.length,
+                    files: files.map(f => ({
+                        id: f.id,
+                        name: f.name,
+                        mimeType: f.mimeType,
+                        parents: f.parents
+                    }))
+                });
+            } catch (err) {
+                updateStatus('driveContents', `Error: ${err.message || err}`);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('initBtn').addEventListener('click', () => {
+            const gapiScript = document.createElement('script');
+            gapiScript.src = 'https://apis.google.com/js/api.js';
+            gapiScript.onload = gapiLoaded;
+            document.body.appendChild(gapiScript);
+
+            const gisScript = document.createElement('script');
+            gisScript.src = 'https://accounts.google.com/gsi/client';
+            gisScript.onload = gisLoaded;
+            document.body.appendChild(gisScript);
+        });
+
+        document.getElementById('authBtn').addEventListener('click', handleAuthClick);
+        document.getElementById('listSharedDrivesBtn').addEventListener('click', listSharedDrives);
+        document.getElementById('listSharedWithMeBtn').addEventListener('click', listSharedWithMe);
+        document.getElementById('listMyDriveBtn').addEventListener('click', listMyDriveFiles);
+        document.getElementById('listDriveContentsBtn').addEventListener('click', listDriveContents);
+    </script>
+</body>
+</html>

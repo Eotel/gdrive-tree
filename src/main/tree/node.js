@@ -1,7 +1,7 @@
-import { produce } from "solid-js/store";
 import _ from "lodash";
+import { produce } from "solid-js/store";
 
-import { store, setStore } from "../../index";
+import { setStore, store } from "../../index";
 
 function getNodeById_(nodes, id) {
   const node = nodes.content[id];
@@ -63,7 +63,7 @@ export function setNodesContent(nodes) {
       for (const node of nodes) {
         s.nodes.content[node.id] = node;
       }
-    })
+    }),
   );
 }
 
@@ -71,7 +71,7 @@ export function setNodeById(id, objUpdatesOrFunctionUpdates) {
   setStore(
     produce((s) => {
       setNodeById_(s.nodes, id, objUpdatesOrFunctionUpdates);
-    })
+    }),
   );
 }
 

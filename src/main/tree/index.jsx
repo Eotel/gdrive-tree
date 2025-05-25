@@ -1,16 +1,16 @@
-import { createEffect, onMount, onCleanup } from "solid-js";
+import { createEffect, onCleanup, onMount } from "solid-js";
 
 import { tabbable } from "tabbable";
 
+import { customTransitionDuration } from "../../globalConstant";
 import Node from "./Node.jsx";
-import { setNodeById, getNodeById, isFolder } from "./node";
 import {
+  adjustBodyWidth,
   findNearestLowerFocusableElement,
   findNearestUpperLiWithId,
-  adjustBodyWidth,
   isElementVisible,
 } from "./htmlElement";
-import { customTransitionDuration } from "../../globalConstant";
+import { getNodeById, isFolder, setNodeById } from "./node";
 
 const Tree = ({ id }) => {
   let treeContainerRef;
@@ -34,47 +34,27 @@ const Tree = ({ id }) => {
     return node().height;
   };
 
-  function findFocusableElement(
-    resTabbable,
-    indexTabbableElement,
-    increment,
-    cycle
-  ) {
+  function findFocusableElement(resTabbable, indexTabbableElement, increment, cycle) {
     const indexNextTabbableElement = cycle
       ? (indexTabbableElement + increment).mod(resTabbable.length)
-      : Math.max(
-          0,
-          Math.min(indexTabbableElement + increment, resTabbable.length - 1)
-        );
+      : Math.max(0, Math.min(indexTabbableElement + increment, resTabbable.length - 1));
     const nextTabbableElement = resTabbable[indexNextTabbableElement];
 
     // Check if every parent elements are expanded, so visible
     if (isElementVisible(nextTabbableElement)) {
       return nextTabbableElement;
     } else {
-      return findFocusableElement(
-        resTabbable,
-        indexNextTabbableElement,
-        increment,
-        cycle
-      );
+      return findFocusableElement(resTabbable, indexNextTabbableElement, increment, cycle);
     }
   }
 
   function findFocusableElementSanity(increment, cycle) {
-    const resTabbable = tabbable(treeContainerRef).filter((elt) =>
-      isElementVisible(elt)
-    );
+    const resTabbable = tabbable(treeContainerRef).filter((elt) => isElementVisible(elt));
     const indexTabbableElement = resTabbable.indexOf(document.activeElement);
     if (indexTabbableElement === -1) {
       return null;
     }
-    return findFocusableElement(
-      resTabbable,
-      indexTabbableElement,
-      increment,
-      cycle
-    );
+    return findFocusableElement(resTabbable, indexTabbableElement, increment, cycle);
   }
 
   function handleKeyDown(event) {
@@ -319,11 +299,7 @@ const Tree = ({ id }) => {
     >
       <div
         ref={treeRef}
-        class={
-          isRoot
-            ? "custom-transition-duration"
-            : "tree custom-transition-duration ml-4"
-        }
+        class={isRoot ? "custom-transition-duration" : "tree custom-transition-duration ml-4"}
       >
         <ul>
           <For each={nodes()}>

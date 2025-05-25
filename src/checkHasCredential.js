@@ -1,4 +1,4 @@
-import { store, setStore } from "./index";
+import { setStore, store } from "./index";
 
 export function checkHasCredential() {
   // WARNING: this if to check the store.nodes.isLoading signal is necessary to

@@ -1,10 +1,11 @@
-import { createSignal, createEffect } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 
-import { store, setStore } from "../index";
 import { checkHasCredential } from "../checkHasCredential";
+import { setStore, store } from "../index";
+import { clearToken } from "../tokenStorage";
 
 const NavBar = () => {
-  let [buttonStyle, setButtonStyle] = createSignal("btn-disabled");
+  const [buttonStyle, setButtonStyle] = createSignal("btn-disabled");
 
   createEffect(checkHasCredential);
 
@@ -17,9 +18,13 @@ const NavBar = () => {
   });
 
   function handleClick() {
-    google.accounts.oauth2.revoke(gapi.client.getToken().access_token, () =>
-      setStore("hasCredential", () => false)
-    );
+    const token = gapi.client.getToken();
+    if (token && token.access_token) {
+      google.accounts.oauth2.revoke(token.access_token, () => {
+        clearToken();
+        setStore("hasCredential", () => false);
+      });
+    }
   }
 
   return (
@@ -28,10 +33,7 @@ const NavBar = () => {
         <a class="normal-case text-xl">GDrive Tree</a>
       </div>
       <div class="navbar-end">
-        <span
-          class={`btn ${buttonStyle()} normal-case text-sm`}
-          onClick={handleClick}
-        >
+        <span class={`btn ${buttonStyle()} normal-case text-sm`} onClick={handleClick}>
           Revoke authorisation
         </span>
       </div>

@@ -1,6 +1,6 @@
+import { useLocation, useNavigate } from "solid-app-router";
 import Header from "./header";
 import Main from "./main";
-import { useNavigate, useLocation } from "solid-app-router";
 
 const App = () => {
   const navigate = useNavigate();

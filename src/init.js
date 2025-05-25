@@ -2,6 +2,7 @@
 // https://developers.google.com/identity/oauth2/web/guides/migration-to-gis#implicit_flow_examples
 
 import { setStore } from "./index";
+import { getSavedToken, hasValidToken } from "./tokenStorage";
 
 export let tokenClient;
 let gapiInited;
@@ -16,10 +17,18 @@ function checkBeforeStart() {
 function gapiInit() {
   gapi.client
     .init({})
-    .then(function () {
-      gapi.client.load(
-        "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"
-      );
+    .then(() => {
+      gapi.client.load("https://www.googleapis.com/discovery/v1/apis/drive/v3/rest");
+
+      // Try to restore saved token
+      const savedToken = getSavedToken();
+      if (savedToken) {
+        console.info("Restoring saved token from localStorage");
+        gapi.client.setToken({
+          access_token: savedToken,
+        });
+      }
+
       gapiInited = true;
       checkBeforeStart();
       console.info("Gapi lib loaded");
@@ -39,7 +48,6 @@ function gisInit() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: import.meta.env.VITE_CLIENT_ID,
     scope: SCOPES,
-    prompt: "consent",
     callback: "",
     ux_mode: "popup",
   });
@@ -63,14 +71,14 @@ function triggerLoadScript(src, onloadCallback, onerrorCallback) {
 // Documentation link :
 // https://levelup.gitconnected.com/how-to-load-external-javascript-files-from-the-browser-console-8eb97f7db778
 triggerLoadScript("https://apis.google.com/js/api.js", gapiLoad, () =>
-  console.error("Cannot load Gapi lib")
+  console.error("Cannot load Gapi lib"),
 );
 
 triggerLoadScript("https://accounts.google.com/gsi/client", gisInit, () =>
-  console.error("Cannot load GIS lib")
+  console.error("Cannot load GIS lib"),
 );
 
-window.onload = function () {
+window.onload = () => {
   // Provide a 'mod' function which compute correctly the modulo
   // operation over negative numbers
   Number.prototype.mod = function (n) {

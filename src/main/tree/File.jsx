@@ -6,9 +6,7 @@ const File = ({ node, mustAutofocus }) => {
       id={node.id}
       class="py-1"
       onClick={(e) => {
-        const childFocusableElement = findNearestLowerFocusableElement(
-          e.currentTarget
-        );
+        const childFocusableElement = findNearestLowerFocusableElement(e.currentTarget);
 
         childFocusableElement.focus();
         // Handle only double click

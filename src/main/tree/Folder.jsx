@@ -1,20 +1,20 @@
-import { createSignal, createEffect, onMount, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 
 import { getSortedNodesFromDirectory } from "../triggerFilesRequest";
-import Tree from "./index";
 import {
-  setNodeById,
-  getRicherNodes,
-  getNodePathByNode,
-  setNodesContent,
-  getNodeById,
-} from "./node";
-import {
+  adjustBodyWidth,
   findChildElementWithPredicat,
   findNearestLowerFocusableElement,
   findNearestUpperLiWithId,
-  adjustBodyWidth,
 } from "./htmlElement";
+import Tree from "./index";
+import {
+  getNodeById,
+  getNodePathByNode,
+  getRicherNodes,
+  setNodeById,
+  setNodesContent,
+} from "./node";
 
 import SpinningWheel from "../../SpinningWheel";
 import { customTransitionDuration } from "../../globalConstant";
@@ -108,10 +108,7 @@ const Folder = ({ node, mustAutofocus }) => {
       if (parentLi === null) {
         return null;
       }
-      const childUl = findChildElementWithPredicat(
-        parentLi,
-        (element) => element.tagName === "UL"
-      );
+      const childUl = findChildElementWithPredicat(parentLi, (element) => element.tagName === "UL");
       if (verbose) {
         console.log("childUl", childUl);
         if (childUl !== null) {
@@ -174,10 +171,7 @@ const Folder = ({ node, mustAutofocus }) => {
     if (hasUpdated) {
       while (nodePath.length) {
         const currentNode = nodePath.pop();
-        updateNodeHeight(
-          currentNode.id,
-          node.isExpanded ? startNodeHeight : -startNodeHeight
-        );
+        updateNodeHeight(currentNode.id, node.isExpanded ? startNodeHeight : -startNodeHeight);
       }
     }
   });
@@ -247,9 +241,7 @@ const Folder = ({ node, mustAutofocus }) => {
           return;
         }
 
-        const childFocusableElement = findNearestLowerFocusableElement(
-          e.currentTarget
-        );
+        const childFocusableElement = findNearestLowerFocusableElement(e.currentTarget);
 
         if (document.activeElement !== childFocusableElement) {
           childFocusableElement.focus();

@@ -1,12 +1,12 @@
-import { render } from "solid-js/web";
-import { createStore } from "solid-js/store";
 import { Router } from "solid-app-router";
+import { createStore } from "solid-js/store";
+import { render } from "solid-js/web";
 
 import "./index.css";
 import "./init";
 import App from "./App";
-import { getRicherNode } from "./main/tree/node";
 import { rootId } from "./globalConstant";
+import { getRicherNode } from "./main/tree/node";
 
 const defaultRootNode = (() => {
   const res = {
@@ -16,7 +16,7 @@ const defaultRootNode = (() => {
         name: "ROOT",
         mimeType: "application/vnd.google-apps.folder",
       },
-      null
+      null,
     ),
     isExpanded: true,
   };
@@ -32,6 +32,8 @@ const defaultStore = {
     isInitialised: false,
     isLoading: false,
   },
+  searchResults: null,
+  isSearchActive: false,
 };
 
 export const [store, setStore] = createStore(defaultStore);
