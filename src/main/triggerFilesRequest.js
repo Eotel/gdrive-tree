@@ -129,6 +129,25 @@ async function loopRequest(listOptions) {
       }
 
       if (gapi.client.getToken() === null) {
+        // Check if we have a saved token before asking for consent
+        const savedToken = getSavedToken();
+        if (savedToken) {
+          console.info("Restoring saved token from localStorage");
+          gapi.client.setToken({
+            access_token: savedToken,
+          });
+          // Try again with the restored token
+          try {
+            const result = await grabFiles(listOptions);
+            resolve(result);
+            return;
+          } catch (retryErr) {
+            console.info("Saved token failed, will request new token");
+            // Clear the invalid token
+            clearToken();
+          }
+        }
+        
         console.info("Ask consentment");
         getToken("consent")
           .then(async (resp) => {
@@ -298,6 +317,25 @@ async function getSharedDrives() {
       }
 
       if (gapi.client.getToken() === null) {
+        // Check if we have a saved token before asking for consent
+        const savedToken = getSavedToken();
+        if (savedToken) {
+          console.info("Restoring saved token from localStorage");
+          gapi.client.setToken({
+            access_token: savedToken,
+          });
+          // Try again with the restored token
+          try {
+            const result = await grabDrives();
+            resolve(result);
+            return;
+          } catch (retryErr) {
+            console.info("Saved token failed, will request new token");
+            // Clear the invalid token
+            clearToken();
+          }
+        }
+        
         console.info("Ask consentment");
         getToken("consent")
           .then(async (resp) => {
