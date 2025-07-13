@@ -19,8 +19,12 @@ export function saveToken(tokenResponse) {
       const expiryTime = Date.now() + tokenResponse.expires_in * 1000;
       localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
     }
+    
+    console.info("Token saved successfully to localStorage");
   } catch (error) {
     console.error("Failed to save token to localStorage:", error);
+    console.error("This may be due to localStorage restrictions in HTTPS environment");
+    console.error("Storage quota exceeded or localStorage disabled");
   }
 }
 
@@ -41,6 +45,7 @@ export function getSavedToken() {
     if (expiryTime) {
       const expiry = Number.parseInt(expiryTime, 10);
       if (Date.now() >= expiry) {
+        console.info("Token expired, clearing from localStorage");
         clearToken();
         return null;
       }
@@ -49,6 +54,7 @@ export function getSavedToken() {
     return token;
   } catch (error) {
     console.error("Failed to get token from localStorage:", error);
+    console.error("localStorage may be blocked in HTTPS environment");
     return null;
   }
 }

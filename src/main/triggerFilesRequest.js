@@ -4,6 +4,7 @@ import { setStore, store } from "../index";
 import { tokenClient } from "../init";
 import { clearToken, getSavedToken, saveToken } from "../tokenStorage";
 import { getRicherNodes, isFolder } from "./tree/node";
+import { debug, logApiRequest, logApiResponse, logApiError } from "../utils/debug";
 
 import { rootId } from "./../globalConstant";
 
@@ -23,23 +24,47 @@ function getToken(promptStr) {
     try {
       // Save current path before authentication
       if (promptStr === "consent") {
-        sessionStorage.setItem("gdrive_auth_return_path", window.location.pathname);
+        try {
+          sessionStorage.setItem("gdrive_auth_return_path", window.location.pathname);
+        } catch (e) {
+          console.error("Failed to save return path to sessionStorage:", e);
+        }
       }
+      
+      console.info(`Requesting OAuth token with prompt: "${promptStr}"`);
+      console.info(`Current location: ${window.location.href}`);
       
       // Deal with the response for a new token
       tokenClient.callback = (resp) => {
+        console.info("OAuth token response received:", {
+          hasError: resp.error !== undefined,
+          error: resp.error,
+          hasAccessToken: !!resp.access_token,
+          expiresIn: resp.expires_in
+        });
+        
         if (resp.error !== undefined) {
+          console.error("OAuth error:", resp.error, resp.error_description);
           reject(resp);
+        } else {
+          // Save the token to localStorage
+          saveToken(resp);
+          resolve(resp);
         }
-        // Save the token to localStorage
-        saveToken(resp);
-        resolve(resp);
       };
+      
       // Ask for a new token
+      debug.auth("Requesting access token with params:", {
+        prompt: promptStr || "",
+        client_id: import.meta.env.VITE_CLIENT_ID,
+        protocol: window.location.protocol,
+        host: window.location.host
+      });
       tokenClient.requestAccessToken({
         prompt: promptStr || "",
       });
     } catch (err) {
+      debug.error("Failed to request token:", err);
       reject(err);
     }
   });
@@ -83,7 +108,9 @@ function buildFilesListArg(args) {
 }
 
 function gFilesList(listOptions) {
-  return gapi.client.drive.files.list(buildFilesListArg(listOptions));
+  const args = buildFilesListArg(listOptions);
+  logApiRequest('drive.files.list', args);
+  return gapi.client.drive.files.list(args);
 }
 
 async function loopRequest(listOptions) {
@@ -103,6 +130,7 @@ async function loopRequest(listOptions) {
         pageToken: nextPageToken,
       });
 
+      logApiResponse('drive.files.list', response.result);
       nextPageToken = response.result.nextPageToken;
       if (response.result.files.length <= 0) {
         nextPageToken = null;
@@ -120,11 +148,19 @@ async function loopRequest(listOptions) {
       const result = await grabFiles(listOptions);
       resolve(result);
     } catch (err) {
-      console.info("First call to google API failed.");
-      console.info(err);
+      debug.info("First call to google API failed.");
+      debug.info(err);
+      console.error("API Error details:", {
+        status: err.status,
+        statusText: err.statusText,
+        message: err.message,
+        error: err.error,
+        result: err.result
+      });
 
       // Clear expired token if it exists
       if (err.status === 401 || err.status === 403) {
+        console.info("Authentication error detected, clearing stored token");
         clearToken();
       }
 
@@ -132,7 +168,7 @@ async function loopRequest(listOptions) {
         // Check if we have a saved token before asking for consent
         const savedToken = getSavedToken();
         if (savedToken) {
-          console.info("Restoring saved token from localStorage");
+          debug.info("Restoring saved token from localStorage");
           gapi.client.setToken({
             access_token: savedToken,
           });
@@ -142,25 +178,25 @@ async function loopRequest(listOptions) {
             resolve(result);
             return;
           } catch (retryErr) {
-            console.info("Saved token failed, will request new token");
+            debug.info("Saved token failed, will request new token");
             // Clear the invalid token
             clearToken();
           }
         }
         
-        console.info("Ask consentment");
+        debug.info("Ask consentment");
         getToken("consent")
           .then(async (resp) => {
             const result = await grabFiles(listOptions);
             resolve(result);
           })
           .catch((err) => {
-            console.error("Cannot call google API.");
-            console.error(err);
+            debug.error("Cannot call google API.");
+            debug.error(err);
             reject(err);
           });
       } else {
-        console.info("Try silent authentication first");
+        debug.info("Try silent authentication first");
         // Try without prompt first (silent authentication)
         getToken("")
           .then(async (resp) => {
@@ -168,7 +204,7 @@ async function loopRequest(listOptions) {
             resolve(result);
           })
           .catch((err) => {
-            console.info("Silent authentication failed, asking for consent");
+            debug.info("Silent authentication failed, asking for consent");
             // If silent auth fails, ask for consent
             getToken("consent")
               .then(async (resp) => {
@@ -176,8 +212,8 @@ async function loopRequest(listOptions) {
                 resolve(result);
               })
               .catch((err) => {
-                console.error("Cannot call google API.");
-                console.error(err);
+                debug.error("Cannot call google API.");
+                debug.error(err);
                 reject(err);
               });
           });
@@ -210,7 +246,7 @@ function addFolderId(folderId) {
 
 function retrieveFolderIds(nodes) {
   nodes.forEach((node) => {
-    // console.log("node", node);
+    // debug.log("node", node);
     if (isFolder(node)) {
       addFolderId(node.id);
     }
@@ -308,8 +344,8 @@ async function getSharedDrives() {
       const result = await grabDrives();
       resolve(result);
     } catch (err) {
-      console.info("First call to google API for drives failed.");
-      console.info(err);
+      debug.info("First call to google API for drives failed.");
+      debug.info(err);
 
       // Clear expired token if it exists
       if (err.status === 401 || err.status === 403) {
@@ -320,7 +356,7 @@ async function getSharedDrives() {
         // Check if we have a saved token before asking for consent
         const savedToken = getSavedToken();
         if (savedToken) {
-          console.info("Restoring saved token from localStorage");
+          debug.info("Restoring saved token from localStorage");
           gapi.client.setToken({
             access_token: savedToken,
           });
@@ -330,25 +366,25 @@ async function getSharedDrives() {
             resolve(result);
             return;
           } catch (retryErr) {
-            console.info("Saved token failed, will request new token");
+            debug.info("Saved token failed, will request new token");
             // Clear the invalid token
             clearToken();
           }
         }
         
-        console.info("Ask consentment");
+        debug.info("Ask consentment");
         getToken("consent")
           .then(async (resp) => {
             const result = await grabDrives();
             resolve(result);
           })
           .catch((err) => {
-            console.error("Cannot call google API for drives.");
-            console.error(err);
+            debug.error("Cannot call google API for drives.");
+            debug.error(err);
             resolve([]); // Return empty array instead of rejecting
           });
       } else {
-        console.info("Try silent authentication first");
+        debug.info("Try silent authentication first");
         // Try without prompt first (silent authentication)
         getToken("")
           .then(async (resp) => {
@@ -356,7 +392,7 @@ async function getSharedDrives() {
             resolve(result);
           })
           .catch((err) => {
-            console.info("Silent authentication failed, asking for consent");
+            debug.info("Silent authentication failed, asking for consent");
             // If silent auth fails, ask for consent
             getToken("consent")
               .then(async (resp) => {
@@ -364,8 +400,8 @@ async function getSharedDrives() {
                 resolve(result);
               })
               .catch((err) => {
-                console.error("Cannot call google API for drives.");
-                console.error(err);
+                debug.error("Cannot call google API for drives.");
+                debug.error(err);
                 resolve([]); // Return empty array instead of rejecting
               });
           });
@@ -376,7 +412,7 @@ async function getSharedDrives() {
 
 async function initSharedDrivesNodes() {
   const drives = await getSharedDrives();
-  console.log(`Fetched ${drives.length} shared drives`);
+  debug.log(`Fetched ${drives.length} shared drives`);
   return drives;
 }
 
@@ -396,7 +432,7 @@ export async function triggerFilesRequest(initSwitch) {
       case "every":
         return initEveryNodes();
       default:
-        console.error(`initSwitch "${initSwitch}" is not handled.`);
+        debug.error(`initSwitch "${initSwitch}" is not handled.`);
         return new Promise((resolve, reject) => {
           resolve([]);
         });
@@ -410,8 +446,10 @@ export async function triggerFilesRequest(initSwitch) {
 
   // Set loading state without clearing all data
   setStore("nodes", "isLoading", true);
+  setStore("error", null);
 
-  const newNodes = await grabFiles(initSwitch);
+  try {
+    const newNodes = await grabFiles(initSwitch);
 
   // For shared drives, the parent should always be "root"
   const parentId = "root";
@@ -451,4 +489,13 @@ export async function triggerFilesRequest(initSwitch) {
     isLoading: false,
     content: newContent,
   }));
+  } catch (error) {
+    debug.error("Error in triggerFilesRequest:", error);
+    setStore("nodes", "isLoading", false);
+    setStore("error", {
+      message: error.message || "ファイルの取得に失敗しました。",
+      details: error.error || error,
+      status: error.status,
+    });
+  }
 }

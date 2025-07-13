@@ -3,6 +3,7 @@
 
 import { setStore } from "./index";
 import { getSavedToken, hasValidToken } from "./tokenStorage";
+import { checkHTTPSEnvironment, logOAuthDebugInfo } from "./utils/httpsDebug";
 
 export let tokenClient;
 let gapiInited;
@@ -11,6 +12,9 @@ let gisInited;
 function checkBeforeStart() {
   if (gapiInited && gisInited) {
     setStore("isExternalLibLoaded", () => true);
+    // HTTPS環境のチェックとOAuth情報のログ出力
+    checkHTTPSEnvironment();
+    logOAuthDebugInfo();
   }
 }
 
@@ -32,6 +36,7 @@ function gapiInit() {
       gapiInited = true;
       checkBeforeStart();
       console.info("Gapi lib loaded");
+      setStore("hasCredential", hasValidToken());
     })
     .catch((err) => {
       console.error("Cannot load Gapi lib");
@@ -45,17 +50,31 @@ function gapiLoad() {
 
 function gisInit() {
   const SCOPES = ["https://www.googleapis.com/auth/drive.readonly"].join(" ");
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: import.meta.env.VITE_CLIENT_ID,
-    scope: SCOPES,
-    callback: "",
-    ux_mode: "popup",
-  });
+  
+  // Detect current protocol and construct redirect URI
+  const currentProtocol = window.location.protocol;
+  const currentHost = window.location.host;
+  const redirectUri = `${currentProtocol}//${currentHost}/`;
+  
+  console.info(`OAuth initialization - Protocol: ${currentProtocol}, Host: ${currentHost}, Redirect URI: ${redirectUri}`);
+  
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: import.meta.env.VITE_CLIENT_ID,
+      scope: SCOPES,
+      callback: "",
+      ux_mode: "popup",
+      redirect_uri: redirectUri,
+    });
 
-  gisInited = true;
-  checkBeforeStart();
+    gisInited = true;
+    checkBeforeStart();
 
-  console.info("GSI lib loaded");
+    console.info("GSI lib loaded successfully");
+  } catch (error) {
+    console.error("Failed to initialize Google OAuth client:", error);
+    console.error("Client ID:", import.meta.env.VITE_CLIENT_ID);
+  }
 }
 
 function triggerLoadScript(src, onloadCallback, onerrorCallback) {
@@ -70,13 +89,16 @@ function triggerLoadScript(src, onloadCallback, onerrorCallback) {
 
 // Documentation link :
 // https://levelup.gitconnected.com/how-to-load-external-javascript-files-from-the-browser-console-8eb97f7db778
-triggerLoadScript("https://apis.google.com/js/api.js", gapiLoad, () =>
-  console.error("Cannot load Gapi lib"),
-);
+triggerLoadScript("https://apis.google.com/js/api.js", gapiLoad, (error) => {
+  console.error("Cannot load Gapi lib", error);
+  console.error("Failed to load:", "https://apis.google.com/js/api.js");
+});
 
-triggerLoadScript("https://accounts.google.com/gsi/client", gisInit, () =>
-  console.error("Cannot load GIS lib"),
-);
+triggerLoadScript("https://accounts.google.com/gsi/client", gisInit, (error) => {
+  console.error("Cannot load GIS lib", error);
+  console.error("Failed to load:", "https://accounts.google.com/gsi/client");
+  console.error("This may be due to CSP restrictions in HTTPS environment");
+});
 
 window.onload = () => {
   // Provide a 'mod' function which compute correctly the modulo

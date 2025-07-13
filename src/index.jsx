@@ -37,6 +37,7 @@ const defaultStore = {
   selectedFile: null,
   fileDetails: null,
   isLoadingFileDetails: false,
+  error: null,
 };
 
 export const [store, setStore] = createStore(defaultStore);

@@ -8,7 +8,17 @@ export function checkHasCredential() {
   store.nodes.isInitialised;
   if (store.isExternalLibLoaded) {
     // Check both gapi token and localStorage token
-    const newHasCredential = gapi.client.getToken() !== null || hasValidToken();
+    const gapiToken = gapi.client.getToken();
+    const hasLocalToken = hasValidToken();
+    const newHasCredential = gapiToken !== null || hasLocalToken;
+    
+    console.info("Credential check:", {
+      hasGapiToken: gapiToken !== null,
+      hasLocalStorageToken: hasLocalToken,
+      newHasCredential: newHasCredential,
+      currentHasCredential: store.hasCredential
+    });
+    
     if (store.hasCredential !== newHasCredential) {
       setStore("hasCredential", () => newHasCredential);
     }
